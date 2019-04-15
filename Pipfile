@@ -7,9 +7,8 @@ verify_ssl = true
 
 [packages]
 requests = "*"
+"rpi.gpio" = "*"
 httplib2 = "*"
-rpi = "*"
-rpi-gpio = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "2.7"
