@@ -46,6 +46,9 @@ import requests
 import RPi.GPIO as GPIO
 import httplib2
 
+from splunk_hce_client import SplunkHCEClient
+from settings import Settings
+
 sys.path.append('/usr/local/etc')
 import pi_garage_alert_config as cfg
 
@@ -60,9 +63,9 @@ def get_garage_door_state(pin):
         pin: GPIO pin number.
     """
     if GPIO.input(pin): # pylint: disable=no-member
-        state = 'open'
-    else:
         state = 'closed'
+    else:
+        state = 'open'
 
     return state
 
@@ -103,43 +106,6 @@ def rpi_status():
     """Return string summarizing RPi status
     """
     return "CPU temp: %.1f, GPU temp: %.1f, Uptime: %s" % (get_gpu_temp(), get_cpu_temp(), get_uptime())
-
-##############################################################################
-# Logging and alerts
-##############################################################################
-
-def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_state):
-    """Send subject and msg to specified recipients
-
-    Args:
-        recipients: An array of strings of the form type:address
-        subject: Subject of the alert
-        msg: Body of the alert
-        state: The state of the door
-    """
-    for recipient in recipients:
-        if recipient[:6] == 'email:':
-            alert_senders['Email'].send_email(recipient[6:], subject, msg)
-        elif recipient[:11] == 'twitter_dm:':
-            alert_senders['Twitter'].direct_msg(recipient[11:], msg)
-        elif recipient == 'tweet':
-            alert_senders['Twitter'].update_status(msg)
-        elif recipient[:4] == 'sms:':
-            alert_senders['Twilio'].send_sms(recipient[4:], msg)
-        elif recipient[:7] == 'jabber:':
-            alert_senders['Jabber'].send_msg(recipient[7:], msg)
-        elif recipient[:11] == 'pushbullet:':
-            alert_senders['Pushbullet'].send_note(recipient[11:], subject, msg)
-        elif recipient[:6] == 'ifttt:':
-            alert_senders['IFTTT'].send_trigger(recipient[6:], subject, state, '%d' % (time_in_state))
-        elif recipient[:6] == 'spark:':
-            alert_senders['CiscoSpark'].send_sparkmsg(recipient[6:], msg)
-        elif recipient == 'gcm':
-            alert_senders['Gcm'].send_push(state, msg)
-        elif recipient[:6] == 'slack:':
-            alert_senders['Slack'].send_message(recipient[6:], state, msg)
-        else:
-            logger.error("Unrecognized recipient type: %s", recipient)
 
 ##############################################################################
 # Misc support
@@ -193,6 +159,8 @@ class PiGarageAlert(object):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.settings = Settings()
+        self.hce_client = SplunkHCEClient()
 
     def main(self):
         """Main functionality
@@ -226,24 +194,8 @@ class PiGarageAlert(object):
             # Last state of each garage door
             door_states = dict()
 
-            # time.time() of the last time the garage door changed state
-            time_of_last_state_change = dict()
-
             # Index of the next alert to send for each garage door
             alert_states = dict()
-
-            # Create alert sending objects
-            alert_senders = {
-                "Jabber": Jabber(door_states, time_of_last_state_change),
-                "Twitter": Twitter(),
-                "Twilio": Twilio(),
-                "Email": Email(),
-                "Pushbullet": Pushbullet(),
-                "IFTTT": IFTTT(),
-                "CiscoSpark": CiscoSpark(),
-                "Gcm": GoogleCloudMessaging(),
-                "Slack": Slack()
-            }
 
             # Read initial states
             for door in cfg.GARAGE_DOORS:
@@ -251,7 +203,6 @@ class PiGarageAlert(object):
                 state = get_garage_door_state(door['pin'])
 
                 door_states[name] = state
-                time_of_last_state_change[name] = time.time()
                 alert_states[name] = 0
 
                 self.logger.info("Initial state of \"%s\" is %s", name, state)
@@ -261,33 +212,14 @@ class PiGarageAlert(object):
                 for door in cfg.GARAGE_DOORS:
                     name = door['name']
                     state = get_garage_door_state(door['pin'])
-                    time_in_state = time.time() - time_of_last_state_change[name]
+                    self.logger.info("state: %s" % state)
 
-                    # Check if the door has changed state
-                    if door_states[name] != state:
-                        door_states[name] = state
-                        time_of_last_state_change[name] = time.time()
-                        self.logger.info("State of \"%s\" changed to %s after %.0f sec", name, state, time_in_state)
-
-                        # Reset alert when door changes state
-                        if alert_states[name] > 0:
-                            # Use the recipients of the last alert
-                            recipients = door['alerts'][alert_states[name] - 1]['recipients']
-                            send_alerts(self.logger, alert_senders, recipients, name, "%s is now %s" % (name, state), state, 0)
-                            alert_states[name] = 0
-
-                        # Reset time_in_state
-                        time_in_state = 0
-
-                    # See if there are more alerts
-                    if len(door['alerts']) > alert_states[name]:
-                        # Get info about alert
-                        alert = door['alerts'][alert_states[name]]
-
-                        # Has the time elapsed and is this the state to trigger the alert?
-                        if time_in_state > alert['time'] and state == alert['state']:
-                            send_alerts(self.logger, alert_senders, alert['recipients'], name, "%s has been %s for %d seconds!" % (name, state, time_in_state), state, time_in_state)
-                            alert_states[name] += 1
+                    event = {}
+                    event['time'] = int(round(time.time()))
+                    event['name'] = name
+                    event['state'] = state
+                    response = self.hce_client.send_event(event)
+                    print("Sensor Response: %s" % response)
 
                 # Periodically log the status for debug and ensuring RPi doesn't get too hot
                 status_report_countdown -= 1
@@ -295,7 +227,7 @@ class PiGarageAlert(object):
                     status_msg = rpi_status()
 
                     for name in door_states:
-                        status_msg += ", %s: %s/%d/%d" % (name, door_states[name], alert_states[name], (time.time() - time_of_last_state_change[name]))
+                        status_msg += ", %s: %s/%d" % (name, door_states[name], alert_states[name])
 
                     self.logger.info(status_msg)
 
@@ -310,7 +242,6 @@ class PiGarageAlert(object):
             logging.critical("%s", traceback.format_exc())
 
         GPIO.cleanup() # pylint: disable=no-member
-        alert_senders['Jabber'].terminate()
 
 if __name__ == "__main__":
     PiGarageAlert().main()
