@@ -10,7 +10,7 @@ class SplunkHCEClient(object):
         index_token = settings.get_field('SplunkHCE', 'index_token')
         if hosts_str and index_token:
             hosts = [host.strip() for host in hosts_str.split(',')]
-            self.splunk_urls = ['http://%s:8088/services/collector/event' % host for host in hosts]
+            self.splunk_urls = ['https://%s:8088/services/collector/event' % host for host in hosts]
             self.headers = {'Authorization': 'Splunk %s' % index_token}
             for splunk_url in self.splunk_urls:
                 print("Splunk HCE Connected to Sensor Index: splunk_url=%s, headers=%s" % (splunk_url, self.headers))
