@@ -220,7 +220,7 @@ class PiGarageAlert(object):
                     event['name'] = name
                     event['state'] = state
                     response = self.hce_client.send_event(event)
-                    print("Sensor Response: %s" % response)
+                    self.logger.debug("Sensor Response: %s" % response)
 
                 # Periodically log the status for debug and ensuring RPi doesn't get too hot
                 status_report_countdown -= 1
