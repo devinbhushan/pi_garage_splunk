@@ -166,7 +166,6 @@ class PiGarageAlert(object):
         """Main functionality
         """
 
-	time.sleep(10)
         try:
             # Set up logging
             log_fmt = '%(asctime)-15s %(levelname)-8s %(message)s'
