@@ -9,6 +9,8 @@ verify_ssl = true
 requests = "*"
 "rpi.gpio" = "*"
 httplib2 = "*"
+configparser = "*"
+pipenv-to-requirements = "*"
 
 [requires]
 python_version = "2.7"
