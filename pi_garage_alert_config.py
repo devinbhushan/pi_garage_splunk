@@ -25,19 +25,7 @@ GARAGE_DOORS = [
 
     {
         'pin': 15,
-        'name': "Example Garage Door",
-        'alerts': [
-#            {
-#                'state': 'open',
-#                'time': 120,
-#                'recipients': [ 'sms:+11112223333', 'email:someone@example.com', 'twitter_dm:twitter_user', 'pushbullet:access_token', 'gcm', 'tweet', 'ifttt:garage_door' ]
-#            },
-#            {
-#                'state': 'open',
-#                'time': 600,
-#                'recipients': [ 'sms:+11112223333', 'email:someone@example.com', 'twitter_dm:twitter_user', 'pushbullet:access_token', 'gcm', 'tweet', 'ifttt:garage_door' ]
-#            }
-        ]
+        'name': "Garage Door"
     }
 ]
 

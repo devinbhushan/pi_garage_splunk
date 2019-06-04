@@ -22,9 +22,6 @@ class SplunkHCEClient(object):
         event = {'event': out}
         body = json.dumps(event).encode('ascii')
 
-        print("headers %s" % self.headers)
-        print("body: %s" % body)
-        print("url: %s" % self.splunk_urls)
         return [requests.post(url=splunk_url,
                               headers=self.headers,
                               data=body,
