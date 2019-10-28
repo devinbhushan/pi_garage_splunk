@@ -14,14 +14,13 @@ class SplunkHCEClient(object):
             self.headers = {'Authorization': 'Splunk %s' % index_token}
             for splunk_url in self.splunk_urls:
                 print("Splunk HCE Connected to Sensor Index: splunk_url=%s, headers=%s" % (splunk_url, self.headers))
-            print("done")
         else:
             raise Exception("Unable to read host or token values!")
 
     def send_event(self, out):
         event = {'event': out}
         body = json.dumps(event).encode('ascii')
-
+    
         return [requests.post(url=splunk_url,
                               headers=self.headers,
                               data=body,

@@ -1,0 +1,14 @@
+[Unit]
+Description=Garage monitor - sends data into Splunk
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python -u pi_garage_alert.py
+WorkingDirectory=/home/pi/projects/pi_garage_splunk
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target
